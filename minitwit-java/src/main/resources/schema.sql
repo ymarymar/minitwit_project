@@ -30,4 +30,4 @@ CREATE INDEX IF NOT EXISTS idx_message_author_pubdate ON message (author_id, pub
 
 INSERT INTO simulator_state (state_key, state_value)
 VALUES ('latest', 0)
-ON CONFLICT (staete_key) DO NOTHING;
+ON CONFLICT (state_key) DO NOTHING;
