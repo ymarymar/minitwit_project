@@ -8,12 +8,12 @@ scrape_configs:
     static_configs:
       - targets:
 {% for host in groups['swarm'] %}
-          - '{{ hostvars[host].ansible_host }}:7070'
+        - '{{ hostvars[host].do_networks.v4 | selectattr("type", "eq", "private") | map(attribute="ip_address") | first }}:7070'
 {% endfor %}
 
   - job_name: 'node'
     static_configs:
       - targets:
 {% for host in groups['swarm'] %}
-          - '{{ hostvars[host].ansible_host }}:9100'
+        - '{{ hostvars[host].do_networks.v4 | selectattr("type", "eq", "private") | map(attribute="ip_address") | first }}:9100'
 {% endfor %}
