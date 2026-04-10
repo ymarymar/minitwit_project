@@ -25,7 +25,7 @@ public class TestDatabaseManager {
             Connection conn = DriverManager.getConnection(url, "sa", "");
             initializeSchema(conn);
 
-            return DSL.using(conn, SQLDialect.H2);
+            return DSL.using(conn, SQLDialect.POSTGRES);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create jOOQ test database", e);
         }
