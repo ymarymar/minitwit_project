@@ -1,5 +1,7 @@
 package zerodowntime;
 
+import static zerodowntime.constants.AppConstants.SimulatorState;
+
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
@@ -20,11 +22,6 @@ public class DatabaseManager {
     private static final Logger log = LoggerFactory.getLogger(DatabaseManager.class);
     private static DSLContext dslContext;
     private static HikariDataSource dataSource;
-
-    private static final String TABLE_SIMULATOR_STATE = "simulator_state";
-    private static final String COL_STATE_KEY = "state_key";
-    private static final String COL_STATE_VALUE = "state_value";
-    private static final String KEY_LATEST = "latest";
 
     public static void init(DataSource dataSource) {
         dslContext = DSL.using(dataSource, SQLDialect.POSTGRES);
@@ -66,24 +63,24 @@ public class DatabaseManager {
 
     public static int getLatest() {
         Integer result = getDsl()
-            .select(DSL.field(COL_STATE_VALUE, Integer.class))
-            .from(DSL.table(TABLE_SIMULATOR_STATE))
-            .where(DSL.field(COL_STATE_KEY).eq(KEY_LATEST))
-            .fetchOne(DSL.field(COL_STATE_VALUE, Integer.class));
+            .select(DSL.field(SimulatorState.COL_VALUE, Integer.class))
+            .from(DSL.table(SimulatorState.TABLE))
+            .where(DSL.field(SimulatorState.COL_KEY).eq(SimulatorState.KEY_LATEST))
+            .fetchOne(DSL.field(SimulatorState.COL_VALUE, Integer.class));
         return result != null ? result : 0;
     }
 
     public static void setLatest(int value) {
         int updated = getDsl()
-            .update(DSL.table(TABLE_SIMULATOR_STATE))
-            .set(DSL.field(COL_STATE_VALUE, Integer.class), value)
-            .where(DSL.field(COL_STATE_KEY).eq(KEY_LATEST))
+            .update(DSL.table(SimulatorState.TABLE))
+            .set(DSL.field(SimulatorState.COL_VALUE, Integer.class), value)
+            .where(DSL.field(SimulatorState.COL_KEY).eq(SimulatorState.KEY_LATEST))
             .execute();
         if (updated == 0) {
             getDsl()
-                .insertInto(DSL.table(TABLE_SIMULATOR_STATE))
-                .columns(DSL.field(COL_STATE_KEY), DSL.field(COL_STATE_VALUE, Integer.class))
-                .values(KEY_LATEST, value)
+                .insertInto(DSL.table(SimulatorState.TABLE))
+                .columns(DSL.field(SimulatorState.COL_KEY), DSL.field(SimulatorState.COL_VALUE, Integer.class))
+                .values(SimulatorState.KEY_LATEST, value)
                 .execute();
         }
     }
@@ -108,15 +105,15 @@ public class DatabaseManager {
 
     private static void seedSimulatorState() {
         int updated = getDsl()
-            .update(DSL.table(TABLE_SIMULATOR_STATE))
-            .set(DSL.field(COL_STATE_VALUE, Integer.class), 0)
-            .where(DSL.field(COL_STATE_KEY).eq(KEY_LATEST))
+            .update(DSL.table(SimulatorState.TABLE))
+            .set(DSL.field(SimulatorState.COL_VALUE, Integer.class), 0)
+            .where(DSL.field(SimulatorState.COL_KEY).eq(SimulatorState.KEY_LATEST))
             .execute();
         if (updated == 0) {
             getDsl()
-                .insertInto(DSL.table(TABLE_SIMULATOR_STATE))
-                .columns(DSL.field(COL_STATE_KEY), DSL.field(COL_STATE_VALUE, Integer.class))
-                .values(KEY_LATEST, 0)
+                .insertInto(DSL.table(SimulatorState.TABLE))
+                .columns(DSL.field(SimulatorState.COL_KEY), DSL.field(SimulatorState.COL_VALUE, Integer.class))
+                .values(SimulatorState.KEY_LATEST, 0)
                 .execute();
         }
     }

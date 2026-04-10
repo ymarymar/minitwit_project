@@ -34,4 +34,14 @@ public class AppConstants {
         public static final String REGISTER = "/web/auth/register";
         public static final String SESSION = "/web/auth/session";
     }
+
+    /**
+     * Database constants for simulator state tracking.
+     */
+    public static class SimulatorState {
+        public static final String TABLE = "simulator_state";
+        public static final String COL_KEY = "state_key"; // NOSONAR
+        public static final String COL_VALUE = "state_value";
+        public static final String KEY_LATEST = "latest"; // NOSONAR
+    }
 }

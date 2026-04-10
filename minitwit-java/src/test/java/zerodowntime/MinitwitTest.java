@@ -64,7 +64,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testRegister() throws IOException {
+    void testRegister() throws IOException {
         RegisterRequest req = new RegisterRequest("user1", "u1@ex.com", "abc", "abc");
 
         try (Response res = http.postJson(PublicApi.REGISTER, req)) {
@@ -107,7 +107,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testLoginLogout() throws IOException {
+    void testLoginLogout() throws IOException {
         // Register using DTO
         RegisterRequest registerReq = new RegisterRequest("user1", "u1@ex.com", "default", "default");
         http.postJson(PublicApi.REGISTER, registerReq).close();
@@ -152,7 +152,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testMessageRecording() throws IOException {
+    void testMessageRecording() throws IOException {
         registerAndLogin("foo", "f@ex.com", "abc");
 
         // Post messages using DTOs
@@ -177,7 +177,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testTimelines() throws IOException {
+    void testTimelines() throws IOException {
         // Create foo user
         registerAndLogin("foo", "f@ex.com", "abc");
         http.postJson(PublicApi.POSTMESSAGE, new MessageRequest("the message by foo")).close();
@@ -227,7 +227,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testUnauthorizedAccess() throws IOException {
+    void testUnauthorizedAccess() throws IOException {
         try (Response res = http.postJson(PublicApi.POSTMESSAGE, new MessageRequest("unauthorized"))) {
             assertThat(res.code()).isEqualTo(401);
         }
@@ -242,7 +242,7 @@ public class MinitwitTest {
     }
 
     @Test
-    public void testNonexistentUserProfile() throws IOException {
+    void testNonexistentUserProfile() throws IOException {
         registerAndLogin("user1", "u1@ex.com", "abc");
 
         try (Response res = http.get(PublicApi.USER_PROFILE + "/nonexistentuser")) {
