@@ -29,11 +29,14 @@ public class MinitwitTest {
     @BeforeEach
     public void setUp() {
         DSLContext db = TestDatabaseManager.createTestDatabase();
+        DatabaseManager.initWithDsl(db);
 
         app = App.createApp(db).start(TEST_PORT);
 
         client = createTestClient();
         http = new TestHelper(client, BASE_URL);
+
+       
     }
 
     @AfterEach
@@ -262,50 +265,51 @@ public class MinitwitTest {
 
     @Test
     public void testSimulatorLatest() throws IOException {
-        String auth = okhttp3.Credentials.basic("simulator", "super_secure1!");
+        String auth = okhttp3.Credentials.basic("simulator", "super_safe!");
 
-        //Initialized latest = 0
+        // Initial latest should be 0
         Request getLatest = new Request.Builder()
             .url(BASE_URL + "/api/latest")
             .build();
 
         try (Response res = client.newCall(getLatest).execute()) {
             assertThat(res.code()).isEqualTo(200);
-            assertThat(res.body().string().contains("\"latest\":0"));
+            assertThat(res.body().string()).contains("\"latest\":0");
         }
 
-        //update latest = 42
+        // Hit a simulator endpoint with ?latest=42 to update it
         Request registerWithLatest = new Request.Builder()
             .url(BASE_URL + "/api/register?latest=42")
             .post(RequestBody.create(
-                "{\"username\":\"simuser\",\"email\":\"su@ex.com\",\"pwd\":\"pass\"}",
+                "{\"username\":\"simuser\",\"email\":\"s@ex.com\",\"pwd\":\"pass\"}",
                 MediaType.parse("application/json")))
             .header("Authorization", auth)
             .build();
-        
-            try (Response res = client.newCall(registerWithLatest).execute()) {
-                assertThat(res.code()).isIn(204,400);
-            }
 
-            try (Response res = client.newCall(getLatest).execute()) {
-                assertThat(res.code()).isEqualTo("200");
-                assertThat(res.body().string().contains("\"latest\":42"));
-            }
+        try (Response res = client.newCall(registerWithLatest).execute()) {
+            assertThat(res.code()).isIn(204, 400); // 400 is fine if user exists
+        }
 
-            //update latest through /msgs endpoint
-            Request msgsWithLatest = new Request.Builder()
-                .url(BASE_URL + "/api/msgs?latest=1000&no=10")
-                .header("Authorization", auth)
-                .build();
+        // Latest should now be 42
+        try (Response res = client.newCall(getLatest).execute()) {
+            assertThat(res.code()).isEqualTo(200);
+            assertThat(res.body().string()).contains("\"latest\":42");
+        }
 
-            try (Response res = client.newCall(msgsWithLatest).execute()) {
-                assertThat(res.code()).isEqualTo(200);
-            }
+        // Update again via a different endpoint
+        Request msgsWithLatest = new Request.Builder()
+            .url(BASE_URL + "/api/msgs?latest=100&no=10")
+            .header("Authorization", auth)
+            .build();
 
-            // latest should be 100
-            try (Response res = client.newCall(getLatest).execute()) {
-                assertThat(res.code()).isEqualTo("200");
-                assertThat(res.body().string().contains("\"latest\":100"));
-            }
+        try (Response res = client.newCall(msgsWithLatest).execute()) {
+            assertThat(res.code()).isEqualTo(200);
+        }
+
+        // Latest should now be 100
+        try (Response res = client.newCall(getLatest).execute()) {
+            assertThat(res.code()).isEqualTo(200);
+            assertThat(res.body().string()).contains("\"latest\":100");
+        }
     }
 }

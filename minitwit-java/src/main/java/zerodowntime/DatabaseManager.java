@@ -48,6 +48,11 @@ public class DatabaseManager {
         seedSimulatorState();
     }
 
+    // init for testing
+    public static void initWithDsl(DSLContext dsl) {
+        dslContext = dsl;
+    }
+
     public static DSLContext getDsl() {
         if (dslContext == null)
             init();
@@ -64,11 +69,18 @@ public class DatabaseManager {
     }
 
     public static void setLatest(int value) {
-        getDsl()
+        int updated = getDsl()
             .update(DSL.table("simulator_state"))
             .set(DSL.field("state_value", Integer.class), value)
             .where(DSL.field("state_key").eq("latest"))
             .execute();
+        if (updated == 0) {
+            getDsl()
+                .insertInto(DSL.table("simulator_state"))
+                .columns(DSL.field("state_key"), DSL.field("state_value", Integer.class))
+                .values("latest", value)
+                .execute();
+        }
     }
 
     private static void initializeSchema() {
