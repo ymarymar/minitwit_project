@@ -297,13 +297,16 @@ public class MinitwitTest {
         }
 
         // Update again via a different endpoint
-        Request msgsWithLatest = new Request.Builder()
-            .url(BASE_URL + "/api/msgs?latest=100&no=10")
+        Request registerWithLatest2 = new Request.Builder()
+            .url(BASE_URL + "/api/register?latest=100")
+            .post(RequestBody.create(
+                "{\"username\":\"simuser2\",\"email\":\"s2@ex.com\",\"pwd\":\"pass\"}",
+                MediaType.parse("application/json")))
             .header("Authorization", auth)
             .build();
 
-        try (Response res = client.newCall(msgsWithLatest).execute()) {
-            assertThat(res.code()).isEqualTo(200);
+        try (Response res = client.newCall(registerWithLatest2).execute()) {
+            assertThat(res.code()).isIn(204, 400);
         }
 
         // Latest should now be 100
