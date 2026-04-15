@@ -12,20 +12,14 @@ services:
     networks:
       - app-network
     deploy:
-      replicas: 2
-      placement:
-        constraints:
-          - node.labels.type == app
+      replicas: 3
 
   svelte-frontend:
     image: despotheanimal/minitwit-svelte:${VERSION:-latest}
     networks:
       - app-network
     deploy:
-      replicas: 2
-      placement:
-        constraints:
-          - node.labels.type == app
+      replicas: 3
 
   nginx:
     image: nginx:alpine
