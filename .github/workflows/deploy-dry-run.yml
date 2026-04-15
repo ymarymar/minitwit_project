@@ -41,8 +41,4 @@ jobs:
         working-directory: infra/ansible
         env:
           DIGITAL_OCEAN_KEY: ${{ secrets.DO_TOKEN }}
-        run: |
-          ansible-playbook site.yml \
-            --tags deploy \
-            --check \
-            --vault-password-fi
+        run: ansible-playbook site.yml --tags deploy --check --vault-password-file=.vault_pass -e version=dry-run-test
