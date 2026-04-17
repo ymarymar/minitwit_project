@@ -1,6 +1,7 @@
 - name: Deploy app stack
   hosts: swarm
   become: true
+  tags: [deploy]
   tasks:
     - name: Create nginx config directory
       file:
@@ -15,6 +16,7 @@
 - name: Deploy stack
   hosts: swarm[0] # Swarm distributes across all nodes automatically
   become: true
+  tags: [deploy]
   vars_files:
     - vars/secrets.yml
 
