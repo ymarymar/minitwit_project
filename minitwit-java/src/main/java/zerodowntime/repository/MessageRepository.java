@@ -85,9 +85,17 @@ public class MessageRepository extends BaseRepository {
     }
 
     public int getPublicTimelineCount() {
-        return db.resultQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'message'")
-                .fetchOne()
-                .get(0, Integer.class);
+        try {
+            return db.resultQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'message'")
+                    .fetchOne()
+                    .get(0, Integer.class);
+        } catch (Exception e) { // this is for the test H2 database. It doesn't have the pg_class, so needs this
+                                // fix.
+            return db.selectCount()
+                    .from(MESSAGE)
+                    .where(MESSAGE.FLAGGED.eq(0))
+                    .fetchOne(0, int.class);
+        }
     }
 
     public List<MessageDto> getMessagesByUserId(int userId, int limit, int offset) {
