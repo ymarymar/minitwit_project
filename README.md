@@ -68,7 +68,7 @@ graph TD
 ```
 </details>
 
-Incoming traffic hits nginx, which terminates TLS (Let's Encrypt, HTTP/2) and routes requests: `/` to the Svelte static frontend, `/api` and `/web` to the Java backend, and `/grafana/` to the Grafana instance. The Java backend connects to PostgreSQL over JDBC. Prometheus scrapes the Java app's `/metrics` endpoint every 5 seconds and the host via node_exporter. Grafana Alloy tails Docker container logs and ships them to Loki; Grafana queries both Prometheus and Loki for dashboards and log exploration.
+Incoming traffic hits the DigitalOcean Load Balancer (168.144.4.198), which terminates TLS (Let's Encrypt cert for zerodt.live) and distributes requests across all three Swarm nodes. Each node runs the Svelte frontend (nginx) and the Java backend. The Java backend connects to PostgreSQL on a dedicated `minitwit-db` droplet over the private network. Prometheus on the `minitwit-monitoring` droplet scrapes all three Swarm node IPs on ports 7070 and 9100. Grafana Alloy runs as a container on each Swarm and db node, shipping logs to Loki on the monitoring droplet (private network, port 3100). Grafana queries both Prometheus and Loki for dashboards and log exploration.
 
 ---
 
@@ -79,12 +79,13 @@ Incoming traffic hits nginx, which terminates TLS (Let's Encrypt, HTTP/2) and ro
 | Backend | Java 21, Javalin 7, jOOQ, HikariCP |
 | Frontend | SvelteKit 2, Svelte 5, TypeScript, TailwindCSS 4 |
 | Database | PostgreSQL 15 |
-| Reverse Proxy | nginx (Alpine), HTTP/2, Let's Encrypt TLS |
-| Containerisation | Docker, Docker Compose |
-| CI/CD | GitHub Actions — test, tag, build, push, deploy |
+| Reverse Proxy | nginx (Alpine) — serving static frontend and proxying API |
+| TLS | DO Load Balancer (168.144.4.198) — Let's Encrypt cert for zerodt.live |
+| Containerisation | Docker Swarm (production, 3-manager cluster), Docker Compose (local dev) |
+| CI/CD | GitHub Actions — tag, test, build, deploy (Ansible), verify |
 | Observability | Prometheus, Grafana, Loki, Grafana Alloy |
 | Code Quality | SonarCloud, Codacy |
-| Infrastructure | Vagrant, DigitalOcean (Droplets + Block Storage) |
+| Infrastructure | OpenTofu, Ansible, DigitalOcean (5 Droplets + Block Storage) |
 
 ---
 
@@ -94,14 +95,14 @@ Incoming traffic hits nginx, which terminates TLS (Let's Encrypt, HTTP/2) and ro
 
 - Docker ≥ 24 and Docker Compose V2
 - Java 21 and Maven 3.9+ (to run tests outside Docker)
-- Vagrant + `vagrant-digitalocean` plugin (cloud deployment only)
+- OpenTofu and Ansible (cloud deployment only)
 
 ### Run locally with Docker Compose
 
 ```bash
 git clone https://github.com/ZeroDownTime-ITU/minitwit_project.git
 cd minitwit_project
-docker compose up --build
+docker compose -f docker-compose.local.yml up --build
 ```
 
 | Service | URL |
@@ -111,7 +112,7 @@ docker compose up --build
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 |
 
-The local stack uses hardcoded dev credentials, hot-reload for the Svelte frontend, and exposes port `5005` for Java remote debugging (attach with any JDWP-compatible debugger).
+The local stack (`docker-compose.local.yml`) uses hardcoded dev credentials, hot-reload for the Svelte frontend, and exposes port `5005` for Java remote debugging (attach with any JDWP-compatible debugger).
 
 ### Run tests
 
@@ -122,40 +123,28 @@ mvn test
 
 The test suite uses an H2 in-memory database and covers: user registration, login/logout, message posting, timeline behaviour (public vs. user), authorisation enforcement, and 404 handling.
 
-### Deploy to DigitalOcean with Vagrant
+### Deploy to DigitalOcean
 
 ```bash
-export DIGITAL_OCEAN_KEY=<your-do-token>
-export SSH_KEY_NAME=<your-do-ssh-key-name>
+export TF_VAR_do_token=<your-do-token>
 
-# Copy and fill in credentials
-cp remote_files/.env.template remote_files/.env
-
-vagrant up minitwit
+cd infra
+./provision.sh   # runs tofu apply then ansible-playbook site.yml
 ```
 
-`provision.sh` runs automatically and:
-1. Installs `doctl` and assigns the reserved IP to the droplet
-2. Mounts the persistent DO Block Storage volume
-3. Creates data directories for Postgres, Prometheus, Grafana, and Loki with correct ownership
-4. Installs Docker and starts all services via `docker compose up -d`
-5. Requests a Let's Encrypt certificate via Certbot (skipped if certs already exist on the volume)
-6. Swaps nginx to the HTTPS config and reloads it
-7. Installs and starts Prometheus `node_exporter` as a systemd service
-
-A `test` VM is also defined (`vagrant up test`) — a smaller `s-1vcpu-1gb` staging droplet at `minitwit.app`.
+`provision.sh` first runs `tofu apply` to create the five DigitalOcean droplets and associated block storage volumes, then runs `ansible-playbook site.yml` to configure Docker Swarm, deploy the app and monitoring stacks, and wire up the DO Load Balancer.
 
 ---
 
 ## CI/CD Pipeline
 
-Two GitHub Actions workflows trigger on pushes to `main` or `master`.
+Two GitHub Actions workflows are relevant for deployment.
 
-### `continous-deployment.yml`
+### `continuous-deployment.yml`
 
-Triggers when changes land in `minitwit-java/`, `minitwit-svelte/`, `monitoring/prometheus/`, or `remote_files/`. Also supports manual dispatch.
+Triggers when changes land in `minitwit-java/` or `minitwit-svelte/`. Also supports manual dispatch.
 
-**Job: tag**
+**Job: tag** (parallel with test)
 Reads the latest `v*.*.*` git tag (defaulting to `v0.0.0`) and bumps the version based on commit message keywords:
 
 | Keyword in commit message | Version bump |
@@ -166,19 +155,28 @@ Reads the latest `v*.*.*` git tag (defaulting to `v0.0.0`) and bumps the version
 
 Creates a git tag and a GitHub release with auto-generated release notes.
 
-**Job: build** (runs after tag)
-1. Sets up JDK 21 (Temurin distribution)
-2. Runs `mvn test` — the pipeline fails here if any test breaks
-3. Builds and pushes three Docker images to Docker Hub (`despotheanimal/` org), tagged with both `:latest` and the new semver tag:
-   - `minitwit-java`
-   - `minitwit-svelte`
-   - `minitwit-prometheus`
-4. Uses Docker Buildx with registry-layer caching for faster subsequent builds
-5. SSHs into the production server and runs `VERSION=<new_tag> /minitwit/deploy.sh`
+**Job: test** (parallel with tag)
+Sets up JDK 21 (Temurin) and runs `mvn test`. The pipeline fails here if any test breaks.
 
-`deploy.sh` writes the new version to `.env`, pulls the updated images, and restarts `java-backend`, `svelte-frontend`, `nginx`, and `prometheus`.
+**Job: build** (needs tag + test)
+Builds and pushes two Docker images to Docker Hub (`despotheanimal/` org), tagged with both `:latest` and the new semver tag:
+- `minitwit-java`
+- `minitwit-svelte`
 
-A migration to Docker Swarm for zero-downtime rolling deployments is currently underway.
+Uses Docker Buildx with registry-layer caching for faster subsequent builds.
+
+**Job: deploy** (needs tag + build)
+Installs Ansible, configures SSH, and runs a rolling Swarm update via:
+```
+ansible-playbook site.yml --tags deploy -e version=<new_tag>
+```
+
+**Job: verify** (needs deploy)
+Polls `https://zerodt.live/api/latest` up to 10 times (15 s apart) and exits non-zero if the endpoint never returns HTTP 200.
+
+### `deploy-test.yml`
+
+Dry-run workflow triggered on pushes to `test/**` branches — runs the same Ansible deploy step with `--check` to validate playbook changes without touching production.
 
 ### `sonar.yml`
 
@@ -190,10 +188,10 @@ Triggers on push to `main`/`master` and on all pull requests. Runs SonarCloud st
 
 ### Metrics
 
-Prometheus scrapes two targets:
+Prometheus (on `minitwit-monitoring`) scrapes six targets — two per Swarm node:
 
-- **`java-backend:7070/metrics`** (every 5 s) — JVM heap, GC pause times, thread count, HikariCP connection pool, and custom Javalin request counters and latency histograms
-- **`172.17.0.1:9100`** (Docker bridge gateway) — host-level CPU, memory, disk, and network via `node_exporter`
+- **`<node-ip>:7070/metrics`** — JVM heap, GC pause times, thread count, HikariCP connection pool, and custom Javalin request counters and latency histograms
+- **`<node-ip>:9100/metrics`** — host-level CPU, memory, disk, and network via `node_exporter`
 
 ### Dashboards
 
@@ -208,7 +206,7 @@ Grafana is provisioned with four dashboards at startup:
 
 ### Logs
 
-Grafana Alloy runs as a sidecar container, discovers all Docker containers via the Docker socket, and ships their logs to Loki. Grafana's Explore view can query logs by container name alongside metrics.
+Grafana Alloy runs as a container on each Swarm node and on the `minitwit-db` droplet. It discovers all Docker containers via the Docker socket and ships their logs to Loki on the `minitwit-monitoring` droplet (private network, port 3100). Loki is not exposed on the public network. Grafana's Explore view can query logs by container name alongside metrics.
 
 Dashboards and logs are accessible at **https://zerodt.live/grafana/**.
 
@@ -222,27 +220,38 @@ Swagger UI is available at **https://zerodt.live/swagger** and the raw OpenAPI s
 
 ```
 minitwit_project/
-├── minitwit-java/          # Javalin backend (Java 21)
-│   ├── src/main/java/      # Controllers, services, repositories, DTOs, jOOQ generated layer
-│   ├── src/test/java/      # Integration tests (JUnit 5 + H2 in-memory DB)
-│   ├── Dockerfile          # Multi-stage: Maven build → eclipse-temurin:21-jre
+├── minitwit-java/              # Javalin backend (Java 21)
+│   ├── src/main/java/          # Controllers, services, repositories, DTOs, jOOQ generated layer
+│   ├── src/test/java/          # Integration tests (JUnit 5 + H2 in-memory DB)
+│   ├── Dockerfile              # Multi-stage: Maven build → eclipse-temurin:21-jre
 │   └── pom.xml
-├── minitwit-svelte/        # SvelteKit frontend (TypeScript, TailwindCSS 4)
-│   ├── src/                # Routes, feature components, bits-ui component library
-│   ├── Dockerfile          # Multi-stage: Node 20 build → nginx:alpine
+├── minitwit-svelte/            # SvelteKit frontend (TypeScript, TailwindCSS 4)
+│   ├── src/                    # Routes, feature components, bits-ui component library
+│   ├── Dockerfile              # Multi-stage: Node 20 build → nginx:alpine
 │   └── package.json
 ├── monitoring/
-│   └── prometheus/         # Custom Prometheus image with baked-in prometheus.yml
-├── remote_files/           # Files rsynced to the production server via Vagrant
-│   ├── docker-compose.yml  # Production stack (9 services)
-│   ├── deploy.sh           # Deployment script invoked by CI
-│   ├── nginx-ssl.conf      # HTTPS + HTTP/2 nginx config (domain-templated)
-│   ├── nginx-http.conf     # HTTP-only bootstrap config (used before certs exist)
-│   └── monitoring/         # Alloy config, Grafana datasource and dashboard provisioning
-├── diagrams/               # Architecture and ER diagrams (SVG)
-├── docker-compose.yml      # Local development stack (hot reload, debug ports)
-├── Vagrantfile             # DigitalOcean provisioning — prod and test VMs
-└── provision.sh            # Server bootstrap script (Docker, certs, node_exporter)
+│   └── grafana/                # Grafana provisioning
+│       ├── dashboards/         # Dashboard JSON files and dashboards.yml loader
+│       └── datasources/        # datasources.yml (Prometheus + Loki)
+├── infra/
+│   ├── terraform/              # OpenTofu config — 5 droplets, volumes, load balancer
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── ansible/                # Ansible playbooks
+│   │   ├── site.yml            # Master playbook (imports base, swarm, db, monitoring, deploy)
+│   │   ├── playbooks/
+│   │   │   ├── base.yml        # Common setup (Docker, node_exporter, Alloy)
+│   │   │   ├── swarm.yml       # Docker Swarm init and join
+│   │   │   ├── db.yml          # PostgreSQL on minitwit-db
+│   │   │   ├── monitoring.yml  # Prometheus, Grafana, Loki on minitwit-monitoring
+│   │   │   └── deploy.yml      # Rolling Swarm service update (--tags deploy)
+│   │   └── inventory.digitalocean.yml
+│   └── provision.sh            # Runs tofu apply then ansible-playbook site.yml
+├── diagrams/                   # Architecture and ER diagrams (SVG)
+├── docker-compose.app.yml      # Swarm app stack (java + svelte services)
+├── docker-compose.monitoring.yml # Swarm monitoring stack (prometheus, grafana, loki, alloy)
+└── docker-compose.local.yml    # Local dev stack (hot reload, debug ports)
 ```
 
 ---
