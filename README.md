@@ -1,49 +1,23 @@
-> A Twitter clone built and deployed as part of the DevOps course at ITU (Spring 2026).
+# MiniTwit
 
-🔗 **Live:** [zerodt.live](http://zerodt.live) 
+> A production microblogging application — live under continuous simulator load at **[zerodt.live](https://zerodt.live)**
+
+[![Live](https://img.shields.io/website?url=https%3A%2F%2Fzerodt.live&label=live&style=flat-square)](https://zerodt.live)
+[![Release](https://img.shields.io/github/v/release/ZeroDownTime-ITU/minitwit_project?style=flat-square)](https://github.com/ZeroDownTime-ITU/minitwit_project/releases/latest)
+[![CI](https://github.com/ZeroDownTime-ITU/minitwit_project/actions/workflows/continuous-deployment.yml/badge.svg)](https://github.com/ZeroDownTime-ITU/minitwit_project/actions/workflows/continuous-deployment.yml)
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/08a89c1b91024097882dca6e9351f7a9)](https://app.codacy.com/gh/ZeroDownTime-ITU/minitwit_project/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 ---
 
-## Table of Contents
+## Overview
 
-- [About](#about)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [Monitoring & Logging](#monitoring--logging)
-- [API Documentation](#api-documentation)
-- [Repository Structure](#repository-structure)
-- [Contributing](#contributing)
-- [Team](#team)
-
----
-
-## About
-
-MiniTwit is an old Python app we've rebuilt using Java, Docker, and modern DevOps tools. It runs in production on DigitalOcean with automated deployments, monitoring, and the whole pipeline.
-
----
-
-## Tech Stack
-
-| Layer          | Technology                     |
-|----------------|--------------------------------|
-| Backend        | Java (Javalin)                 |
-| Frontend       | Svelte                         |
-| Database       | PostgreSQL                     |
-| Reverse Proxy  | nginx                          |
-| Containerization | Docker / Docker Compose      |
-| CI/CD          | GitHub Actions                 |
-| Monitoring     | Prometheus & Grafana           |
-| Infrastructure | DigitalOcean                   |
-| Provisioning   | Vagrant                        |
+MiniTwit is a microblogging application refactored and operated as part of the MSc DevOps course at IT University of Copenhagen. It available at [zerodt.live](https://zerodt.live) under continuous load from a course-operated simulator that registers users, posts messages, and queries the API around the clock. The project covers the full DevOps lifecycle: automated CI/CD, containerised deployment, infrastructure-as-code, and production observability.
 
 ---
 
 ## Architecture
+
 <details>
 <summary>Architecture Diagram (click to expand)</summary>
     
@@ -93,7 +67,25 @@ graph TD
     Javalin -->|metrics| Prometheus
 ```
 </details>
-Brief description of how the components interact here.
+
+Incoming traffic hits the DigitalOcean Load Balancer (168.144.4.198), which terminates TLS (Let's Encrypt cert for zerodt.live) and distributes requests across all three Swarm nodes. Each node runs the Svelte frontend (nginx) and the Java backend. The Java backend connects to PostgreSQL on a dedicated `minitwit-db` droplet over the private network. Prometheus on the `minitwit-monitoring` droplet scrapes all three Swarm node IPs on ports 7070 and 9100. Grafana Alloy runs as a container on each Swarm and db node, shipping logs to Loki on the monitoring droplet (private network, port 3100). Grafana queries both Prometheus and Loki for dashboards and log exploration.
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|---|---|
+| Backend | Java 21, Javalin 7, jOOQ, HikariCP |
+| Frontend | SvelteKit 2, Svelte 5, TypeScript, TailwindCSS 4 |
+| Database | PostgreSQL 15 |
+| Reverse Proxy | nginx (Alpine) |
+| TLS | DO Load Balancer (168.144.4.198) |
+| Containerisation | Docker Swarm (production, 3-manager cluster), Docker Compose (local dev) |
+| CI/CD | GitHub Actions |
+| Observability | Prometheus, Grafana, Loki, Grafana Alloy |
+| Code Quality | SonarCloud, Codacy |
+| Infrastructure | OpenTofu, Ansible, DigitalOcean Droplets, DigitalOcean Volumes |
 
 ---
 
@@ -101,127 +93,175 @@ Brief description of how the components interact here.
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Git
+- Docker ≥ 24 and Docker Compose V2
+- Java 21 and Maven 3.9+ (to run tests outside Docker)
+- OpenTofu and Ansible (cloud deployment only)
 
-### Run Locally
-```
-TODO: This is just a template update it
-```
+### Run locally with Docker Compose
+
 ```bash
-git clone https://github.com/<org>/minitwit.git
-cd minitwit
-docker-compose up --build
+git clone https://github.com/ZeroDownTime-ITU/minitwit_project.git
+cd minitwit_project
+docker compose -f docker-compose.local.yml up --build
 ```
 
-The application will be available at `http://localhost:<port>`.
+| Service | URL |
+|---|---|
+| Frontend (Vite dev server) | http://localhost:5173 |
+| Backend API | http://localhost:7070 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
+
+The local stack (`docker-compose.local.yml`) uses hardcoded dev credentials, hot-reload for the Svelte frontend, and exposes port `5005` for Java remote debugging (attach with any JDWP-compatible debugger).
+
+### Run tests
+
+```bash
+cd minitwit-java
+mvn test
+```
+
+The test suite uses an H2 in-memory database and covers: user registration, login/logout, message posting, timeline behaviour (public vs. user), authorisation enforcement, and 404 handling.
+
+### Deploy to DigitalOcean
+
+```bash
+export TF_VAR_do_token=<your-do-token>
+
+cd infra
+./provision.sh   # runs tofu apply then ansible-playbook site.yml
+```
+
+`provision.sh` first runs `tofu apply` to create the five DigitalOcean droplets and associated block storage volumes, then runs `ansible-playbook site.yml` to configure Docker Swarm, deploy the app and monitoring stacks, and wire up the DO Load Balancer.
 
 ---
 
 ## CI/CD Pipeline
 
-Our GitHub Actions workflow handles:
+Two GitHub Actions workflows are relevant for deployment.
 
-1. **Build** — Compile and build Docker images
-2. **Test** — Run unit and integration tests
-3. **Deploy** — Push images and deploy to DigitalOcean droplet
+### `continuous-deployment.yml`
+
+Triggers when changes land in `minitwit-java/` or `minitwit-svelte/`. Also supports manual dispatch.
+
+**Job: tag** (parallel with test)
+Reads the latest `v*.*.*` git tag (defaulting to `v0.0.0`) and bumps the version based on commit message keywords:
+
+| Keyword in commit message | Version bump |
+|---|---|
+| `#major` | `v1.2.3` → `v2.0.0` |
+| `#minor` | `v1.2.3` → `v1.3.0` |
+| *(anything else)* | `v1.2.3` → `v1.2.4` |
+
+Creates a git tag and a GitHub release with auto-generated release notes.
+
+**Job: test** (parallel with tag)
+Sets up JDK 21 (Temurin) and runs `mvn test`. The pipeline fails here if any test breaks.
+
+**Job: build** (needs tag + test)
+Builds and pushes two Docker images to Docker Hub (`despotheanimal/` org), tagged with both `:latest` and the new semver tag:
+- `minitwit-java`
+- `minitwit-svelte`
+
+Uses Docker Buildx with registry-layer caching for faster subsequent builds.
+
+**Job: deploy** (needs tag + build)
+Installs Ansible, configures SSH, and runs a rolling Swarm update via:
+```
+ansible-playbook site.yml --tags deploy -e version=<new_tag>
+```
+
+**Job: verify** (needs deploy)
+Polls `https://zerodt.live/api/latest` up to 10 times (15 s apart) and exits non-zero if the endpoint never returns HTTP 200.
+
+### `deploy-test.yml`
+
+Dry-run workflow triggered on pushes to `test/**` branches — runs the same Ansible deploy step with `--check` to validate playbook changes without touching production.
+
+### `sonar.yml`
+
+Triggers on push to `main`/`master` and on all pull requests. Runs SonarCloud static analysis (`mvn sonar:sonar`) against the `zerodowntime-itu` organisation.
 
 ---
 
-## Monitoring & Logging
+## Observability
 
-- **Prometheus** collects metrics from the application and infrastructure
-- **Grafana** dashboards visualize key metrics
+### Metrics
 
-### Key Metrics Tracked
-```
-TODO: This is just a template update it 
-```
+Prometheus (on `minitwit-monitoring`) scrapes six targets — two per Swarm node:
 
-- Request rate and latency
-- Error rates (HTTP 4xx/5xx)
-- System resource usage (CPU, memory)
-- Database query performance
+- **`<node-ip>:7070/metrics`** — JVM heap, GC pause times, thread count, HikariCP connection pool, and custom Javalin request counters and latency histograms
+- **`<node-ip>:9100/metrics`** — host-level CPU, memory, disk, and network via `node_exporter`
 
-### Grafana Access
+### Dashboards
 
-- Grafana: [zerodt.live/grafana](https://zerodt.live/grafana/) 
+Grafana is provisioned with four dashboards at startup:
 
----
+| Dashboard | What it shows |
+|---|---|
+| HTTP Requests | Request rate, latency, status codes by endpoint |
+| JVM Resources | Heap memory, GC pause times, thread count |
+| PostgreSQL Database | Query rate, connection pool usage |
+| Server Health | CPU, memory, and disk utilisation |
 
-## API Documentation
-```
-TODO: This is just a template update it 
-```
-The simulator API exposes the following endpoints:
+### Logs
 
-| Method | Endpoint              | Description                |
-|--------|-----------------------|----------------------------|
-| GET    | `/public`             | Public timeline            |
-| GET    | `/msgs`               | Get messages                |
-| GET    | `/msgs/<username>`    | Get messages for user       |
-| POST   | `/msgs/<username>`    | Post a message              |
-| GET    | `/fllws/<username>`   | Get follows for user        |
-| POST   | `/fllws/<username>`   | Follow/unfollow a user      |
-| POST   | `/register`           | Register a new user         |
-| GET    | `/latest`             | Get latest processed command|
+Grafana Alloy runs as a container on each Swarm node and on the `minitwit-db` droplet. It discovers all Docker containers via the Docker socket and ships their logs to Loki on the `minitwit-monitoring` droplet (private network, port 3100). Loki is not exposed on the public network. Grafana's Explore view can query logs by container name alongside metrics.
 
-### Swagger Access
+Dashboards and logs are accessible at **https://zerodt.live/grafana/**.
 
-- Swagger: [zerodt.live/swagger](https://zerodt.live/swagger#/) 
+### API docs
+
+Swagger UI is available at **https://zerodt.live/swagger** and the raw OpenAPI spec at **https://zerodt.live/openapi**.
 
 ---
 
-<!-- Expand with request/response examples if needed -->
-
----
-
-## Repository Structure
-
-![ER Diagram](diagrams/er_diagram.svg)
+## Project Structure
 
 ```
-minitwit/
-├── src/                    # Backend source code (Javalin)
-├── frontend/               # Svelte frontend
-├── docker-compose.yml      # Container orchestration
-├── Dockerfile              # Application container
-├── nginx/                  # Reverse proxy configuration
-├── prometheus/             # Prometheus config
-├── grafana/                # Grafana dashboards & provisioning
-├── .github/workflows/      # CI/CD pipeline definitions
-├── deploy.sh               # Deployment script
-├── provision.sh            # Provisioning script
-├── Vagrantfile             # Vagrant setup
-└── README.md
+minitwit_project/
+├── minitwit-java/              # Javalin backend (Java 21)
+│   ├── src/main/java/          # Controllers, services, repositories, DTOs, jOOQ generated layer
+│   ├── src/test/java/          # Integration tests (JUnit 5 + H2 in-memory DB)
+│   ├── Dockerfile              # Multi-stage: Maven build → eclipse-temurin:21-jre
+│   └── pom.xml
+├── minitwit-svelte/            # SvelteKit frontend (TypeScript, TailwindCSS 4)
+│   ├── src/                    # Routes, feature components, bits-ui component library
+│   ├── Dockerfile              # Multi-stage: Node 20 build → nginx:alpine
+│   └── package.json
+├── monitoring/
+│   └── grafana/                # Grafana provisioning
+│       ├── dashboards/         # Dashboard JSON files and dashboards.yml loader
+│       └── datasources/        # datasources.yml (Prometheus + Loki)
+├── infra/
+│   ├── terraform/              # OpenTofu config — 5 droplets, volumes, load balancer
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   ├── ansible/                # Ansible playbooks
+│   │   ├── site.yml            # Master playbook (imports base, swarm, db, monitoring, deploy)
+│   │   ├── playbooks/
+│   │   │   ├── base.yml        # Common setup (Docker, node_exporter, Alloy)
+│   │   │   ├── swarm.yml       # Docker Swarm init and join
+│   │   │   ├── db.yml          # PostgreSQL on minitwit-db
+│   │   │   ├── monitoring.yml  # Prometheus, Grafana, Loki on minitwit-monitoring
+│   │   │   └── deploy.yml      # Rolling Swarm service update (--tags deploy)
+│   │   └── inventory.digitalocean.yml
+│   └── provision.sh            # Runs tofu apply then ansible-playbook site.yml
+├── diagrams/                   # Architecture and ER diagrams (SVG)
+├── docker-compose.app.yml      # Swarm app stack (java + svelte services)
+├── docker-compose.monitoring.yml # Swarm monitoring stack (prometheus, grafana, loki, alloy)
+└── docker-compose.local.yml    # Local dev stack (hot reload, debug ports)
 ```
-
----
-
-## Contributing
-```
-TODO: This is just a template update it 
-```
-1. Create a feature branch from `main`: `git checkout -b feature/my-feature`
-2. Commit with descriptive messages
-3. Open a Pull Request for review
-4. At least one team member must approve before merge
-
-<!-- Add any branch naming conventions, commit message format, etc. -->
 
 ---
 
 ## Team
 
-**Team ZeroDownTime** - ITU DevOps Spring 2026
+**ZeroDownTime** — MSc DevOps, IT University of Copenhagen, Spring 2026
 
-- Mathias
-- Corbijn
-- Magnus
-- Kasper
-- Ymir
-
-
----
-
-This project was developed as part of the DevOps course at the IT University of Copenhagen.
+- Corbijn Bulsink
+- Mathias Søgaard
+- Magnus Bergstedt
+- Kasper Larsson
+- Ymir Arnarson
