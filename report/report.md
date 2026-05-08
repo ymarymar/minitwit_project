@@ -35,7 +35,7 @@ Minitwit is a Twitter clone built with a Svelte frontend, a Java (Javalin) REST 
 
 ### Infrastructure Architecture
 
-![alt text](diagrams/Minitwit%20-%20Request%20flow.png)
+![Request flow](diagrams/Minitwit%20-%20Request%20flow.png)
 
 The production system runs across five DigitalOcean droplets as illustrated in the above figure. Three manager-worker swarm nodes form the application cluster, one dedicated droplet hosts the PostgreSQL database, and one dedicated droplet hosts the monitoring stack. Both the database and monitoring droplets have a DigitalOcean block storage volume attached, ensuring data persists across droplet recreations.
 
@@ -45,13 +45,13 @@ Docker Swarm manages container orchestration across the three nodes, running thr
 
 ### Monitoring Architecture
 
-![alt text](diagrams/Minitwit%20-%20Monitoring%20flow.png)
+![Monitoring flow](diagrams/Minitwit%20-%20Monitoring%20flow.png)
 
 Grafana Alloy runs on all the droplets, collecting logs of all the containers on each droplet and shipping them to Loki on the monitoring droplet. Prometheus scrapes metrics from the Java backend (/metrics) and node exporter on each node every 15 seconds. Grafana provides a unified dashboard querying both Prometheus and Loki. Node exporter exposes system-level metrics about the host machine, like CPU usage, memory, disk I/O and network traffic that prometheus can scrape and pass to Grafana for visualization.
 
 ### Application Architecture
 
-![alt text](diagrams/Minitwit%20-%20Component%20diagram.png)
+![Application architecture](diagrams/Minitwit%20-%20Component%20diagram.png)
 
 The backend follows a three-layer architecture as illustrated in the above diagram. The API layer is split into two distinct entry points:
 
