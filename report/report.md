@@ -46,13 +46,13 @@ A DigitalOcean load balancer sits in front of the three swarm nodes, handling SS
 
 ### Monitoring Architecture
 
-![alt text](diagrams/Minitwit%20-%20Monitoring%20flow.png)
+![Monitoring flow](diagrams/Minitwit%20-%20Monitoring%20flow.png)
 
 Grafana Alloy runs on all the droplets, collecting logs of all the containers on each droplet and shipping them to Loki on the monitoring droplet. Prometheus scrapes metrics from the Java backend (/metrics) and node exporter on each node every 15 seconds. Grafana provides a unified dashboard querying both Prometheus and Loki. Node exporter exposes system-level metrics about the host machine, like CPU usage, memory, disk I/O and network traffic that prometheus can scrape and pass to Grafana for visualization.
 
 ### Application Architecture
 
-![Components](diagrams/Minitwit%20-%20Component%20diagram.png)
+![Application architecture](diagrams/Minitwit%20-%20Component%20diagram.png)
 
 The backend follows a three-layer architecture as illustrated in the above diagram. The API layer is split into two distinct entry points:
 
