@@ -96,13 +96,13 @@ By using OpenTofu in conjunction with Ansible, we have been able to more easily 
 
 ### Github Workflows | CI/CD as code
 
-## Monitoring Architecture and Data Flow
-
-### Dashboard Structure Basic Model
-
 GitHub Actions was chosen for its native integration with our existing GitHub repository, eliminating the need for a separate CI/CD service. While alternatives such as Jenkins or Forgejo offer self-hosted execution and faster feedback loops, the operational overhead of maintaining additional infrastructure outweighed the benefits at our scale. The pipeline implements continuous deployment: every push to main that touches application code is automatically tagged, tested, built, and deployed to production without manual intervention, as illustrated in the activity and sequence diagrams. Tests act as the deployment gate, meaning a failing test job would block the build and deploy stages from running. A dry-run workflow on test/** branches allowed us to validate infrastructure changes safely before merging.
 
 ![alt text](diagrams/CICD_Pipeline_StateVersion.png)
+
+## Monitoring Architecture and Data Flow
+
+### Dashboard Structure Basic Model
 
 Our monitoring setup consists of three components:
 
