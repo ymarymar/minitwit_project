@@ -116,6 +116,8 @@ For logging, Grafana Alloy runs on each droplet and ships container logs to Loki
 
 ![Centralized logging in Grafana](images/logsGrafana.jpg)
 
+We built three dashboards covering different layers of the system. The HTTP Requests dashboard tracked request rate, failure rate, response times, and total request counts per endpoint which became the most operationally useful, giving direct visibility into simulator traffic and API health. The JVM Resources dashboard monitored heap usage, thread states, garbage collection, and Hikari connection pool saturation and acquisition latency. The Minitwit Server Health dashboard used node exporter to track CPU, memory, disk usage, and disk I/O across the droplets. In combination with the built dashboards we made use of the Grafana Logs drilldown via Loki. After some lable engineering, the log drilldown allowed us to inspect live log streams per container, namely, nginx, the Java backend, Svelte, and the monitoring stack itself. A Postgres dashboard was set up to track total users, messages, and follows, though it was never fully wired up to a data source.
+
 
 ## Security
 
