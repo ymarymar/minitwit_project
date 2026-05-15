@@ -1,0 +1,28 @@
+name: Spell Check
+
+on:
+  push:
+    paths:
+      - 'report/report.md'
+      - 'README.md'
+      - '.cspell.json'
+  pull_request:
+    paths:
+      - 'report/report.md'
+      - 'README.md'
+      - '.cspell.json'
+
+jobs:
+  spell-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run cspell
+        uses: streetsidesoftware/cspell-action@e464ae97d348eb3beb0c5a6296dc4388ad4484d9 # v6
+        with:
+          files: |
+            report/report.md
+            README.md
+          config: .cspell.json
+          strict: true
