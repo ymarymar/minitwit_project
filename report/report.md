@@ -100,110 +100,22 @@ GitHub Actions was chosen for its native integration with our existing GitHub re
 
 ## Monitoring Architecture and Data Flow
 
-### Dashboard Structure Basic Model
+Yes — the monitoring section is the main problem. As discussed earlier, it reads like a Prometheus tutorial rather than a description of your system. The logging section has the same issue.
 
-Our monitoring setup consists of three components:
+Here's a drop-in replacement for everything between the CI/CD section and Security:
 
-- Application - Javalin app - produces metrics
-- Prometheus - collects and stores metrics over time
-- Grafana - visualizes metrics
+---
 
-### How metrics are stored (labels + time)
+## Monitoring Architecture and Data Flow
 
-Each metric is not just one value.
-It is split into multiple counters based on labels, and each of those is tracked over time.
+Our monitoring setup consists of three components working in sequence: the Javalin backend exposes metrics at `/metrics`, Prometheus scrapes that endpoint every 15 seconds and stores the resulting time series, and Grafana queries Prometheus to visualize request rates, error rates, and trends over time. Each metric is tracked across method, path, and status code, meaning Prometheus maintains a separate time series for each unique combination, making it possible to monitor per-endpoint traffic and error rates independently.
 
-### Labels (different counters)
+![Http Requests dashboard in Grafana](images/httpRequestGrafana.jpg)
 
-When we define:
+For logging, Grafana Alloy runs on each droplet and ships container logs to Loki on the monitoring droplet. Grafana queries Loki alongside Prometheus, giving a unified view of metrics and logs on the same dashboard and making it possible to correlate a spike in error rates with the specific log entries that caused it.
 
-```
-.labelNames("method", "path", "status")
-```
+![Centralized logging in Grafana](images/logsGrafana.jpg)
 
-we are creating a separate counter for each combination of method, path and status so at one point in time, the application exposes:
-
-```
-minitwit_http_requests_total{method="GET",  path="/api/msgs",  status="200"} = 10
-minitwit_http_requests_total{method="POST", path="/api/msgs",  status="200"} = 5
-minitwit_http_requests_total{method="GET",  path="/api/fllws", status="404"} = 2
-```
-
-Each of these is its own counter. Prometheus calls /metrics repeatedly every 15 seconds and stores the values as such:
-
-```
-(GET, /api/msgs, 200)
-00:00 -> 5
-00:15 -> 7
-00:30 -> 10
-
-(POST, /api/msgs, 200)
-00:00 -> 2
-00:15 -> 3
-00:30 -> 5
-```
-
-For every label combination, Prometheus stores a timeline of values. Many counters (labels). Each with its own history - hence each unique set of labels creates its own time series that Prometheus tracks over time.
-
-### How Queries Work
-
-Prometheus stores all collected snapshots as a time series `[100, 120, 150, ...]`
-Historical data is created by Prometheus repeatedly sampling the application.
-Functions like: `rate(minitwit_http_requests_total[5m])` work by comparing stored values over time: `(150 - 120) / time`
-
-This allows Prometheus to compute:
-
-- request rate (requests per second)
-- trends over time
-- error rates etc
-
-### Role of Grafana
-
-Grafana does not store or compute metrics it queries Prometheus then visualizes the returned time series data. The system works because of the following separation:
-
-- Application - only knows the current value
-- Prometheus - builds history by sampling repeatedly
-
-Without Prometheus, there is no history
-Without history, there are no rates or trends
-
-### Logging Architecture and Data Flow
-
-**How logs are stored**
-
-Logs are not numeric values like metrics but textual events describing what happens in the system. Each log entry represents a specific event such as an error, request, or system message.
-The application produces logs using a logger, for example:
-
-```
-log.error(...)
-log.info(...)
-```
-
-At one point in time, the application may produce logs such as:
-
-```
-User login failed for user X
-Request to /api/msgs returned 500
-User Y followed user Z
-```
-
-Each of these is an individual log entry.
-Loki collects these logs and stores them over time, similar to how Prometheus stores metrics, but without aggregating them into numeric values.
-
-**How logs are queried**
-Logs are stored as a timeline of events rather than a sequence of numbers.
-Instead of computing rates or averages, logs are queried to:
-
-- find specific events
-- trace errors
-- understand what happened at a given point in time
-
-**Loki's Role of Grafana**
-Grafana queries Loki and visualizes logs in a searchable format.
-The system works because of the following separation:
-
-- Application - produces log messages
-- Loki - builds history by storing logs over time
 
 ## Security
 
