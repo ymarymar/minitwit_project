@@ -207,54 +207,14 @@ The system works because of the following separation:
 
 ## Security
 
-### Git Break In {#git-break-in}
-
-**Risk level:** High (Impact: High, Probability: Medium.)
-
-**Description:** If a team member's GitHub account is compromised, an attacker can grant themselves admin rights, push malicious code, and approve pull requests.
-
-**Mitigation & Scenarios:** We enforce two-factor authentication and restrict admin privileges through RBAC, including a super-admin role.
-
-### Java Dependencies {#java-dependencies}
-
-**Risk level:** High (Impact: High, Probability: Medium.)
-
-**Description:** Our system relies heavily on the Javalin framework and third-party libraries for all endpoints and HTTP(S) traffic.
-
-**Mitigation & Scenarios:** We keep all dependencies updated to stable versions and monitor for known vulnerabilities.
-
-### Java Database {#java-database}
-
-**Risk level:** Medium (Impact: Medium, Probability: Medium.)
-
-**Description:** We use JOOQ ORM and the PostgreSQL JDBC driver to interact with the database, which can introduce SQL-related risks.
-
-**Mitigation & Scenarios:** We avoid raw SQL concatenation and ensure all database-related libraries are kept up to date.
-
-### Digital Ocean {#digital-ocean}
-
-**Risk level:** High (Impact: High, Probability: Medium.)
-
-**Description:** Deletion of droplets or volumes can lead to downtime and data loss.
-
-**Mitigation & Scenarios:** We perform daily backups and use Terraform to recreate infrastructure if resources are deleted.
-
-### Node Modules (NPM) {#node-modules}
-
-**Risk level:** Medium (Impact: Medium, Probability: Medium.)
-
-**Description:** Third-party Node dependencies may introduce vulnerabilities or be compromised through supply chain attacks.
-
-**Mitigation & Scenarios:** We audit dependencies (e.g. npm audit), keep packages updated, and review new additions carefully.
-
-### UFW {#ufw}
-
-**Risk level:** High (Impact: High, Probability: Medium.)
-
-**Description:** If the firewall is misconfigured, unnecessary ports may be exposed. Docker port mappings can bypass firewall rules.
-
-**Mitigation & Scenarios:** We deny incoming traffic by default, allow only required ports, restrict SSH access, and ensure Docker does not bypass UFW.
-
+| Risk | Risk Level | Impact | Probability | Description | Mitigation |
+|------|------------|--------|-------------|-------------|------------|
+| Git Break In | High | High | Medium | If a team member's GitHub account is compromised, an attacker can grant themselves admin rights, push malicious code, and approve pull requests. | Enforce two-factor authentication and restrict admin privileges through RBAC, including a super-admin role. |
+| Java Dependencies | High | High | Medium | The system relies heavily on the Javalin framework and third-party libraries for all endpoints and HTTP(S) traffic. | Keep all dependencies updated to stable versions and monitor for known vulnerabilities. |
+| Java Database | Medium | Medium | Medium | JOOQ ORM and the PostgreSQL JDBC driver are used to interact with the database, which can introduce SQL-related risks. | Avoid raw SQL concatenation and ensure all database-related libraries are kept up to date. |
+| Digital Ocean | High | High | Medium | Deletion of droplets or volumes can lead to downtime and data loss. | Perform daily backups and use Terraform to recreate infrastructure if resources are deleted. |
+| Node Modules (NPM) | Medium | Medium | Medium | Third-party Node dependencies may introduce vulnerabilities or be compromised through supply chain attacks. | Audit dependencies (e.g. `npm audit`), keep packages updated, and review new additions carefully. |
+| UFW | High | High | Medium | If the firewall is misconfigured, unnecessary ports may be exposed. Docker port mappings can bypass firewall rules. | Deny incoming traffic by default, allow only required ports, restrict SSH access, and ensure Docker does not bypass UFW. |
 
 \newpage
 
