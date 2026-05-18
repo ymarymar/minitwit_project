@@ -87,6 +87,8 @@ The two diagrams below shows the dependencies across the project such as build t
 ![Dependency for the app](images/dependency-diagram-app.svg)
 ![Dependency for the infrastructure](images/dependency-diagram-infra.svg)
 
+![Dependency for the app](images/dependency-diagram-app.svg)
+![Dependency for the infrastructure](images/dependency-diagram-infra.svg)
 
 `Minitwit-java` uses the `pom.xml` file for managing its dependencies whereas the Svelte frontend uses npm (node package manager) to manage its dependencies. The infrastructure of the VMs is being handled by OpenTofu (TerraForm) which creates the necessary droplets and volumes (for data storage) through the `main.tf` script - Ansible is then provisioning each machine with `base.yml` - installing all the shared dependencies across nodes - and then, depending on the VM, provisions the VM with either `swarm.yml`, `db.yml`, `monitoring.yml`. Then the final *playbook* `deploy.yml` deploys the docker swarm/stack.
 
@@ -102,7 +104,7 @@ By using OpenTofu in conjunction with Ansible, we have been able to more easily 
 
 GitHub Actions was chosen for its native integration with our existing GitHub repository, eliminating the need for a separate CI/CD service. While alternatives such as Jenkins or Forgejo offer self-hosted execution and faster feedback loops, the operational overhead of maintaining additional infrastructure outweighed the benefits at our scale. The pipeline implements continuous deployment: every push to main that touches application code is automatically version-tagged, tested, built, and deployed to production without manual intervention, as illustrated in the activity and sequence diagrams. Tests act as the deployment gate, meaning a failing test job would block the build and deploy stages from running. The test suite covers the core application flows (registration, authentication, timelines, and follow/unfollow behaviour) as well as the simulator API endpoints that were actively tested against during the course. A dry-run workflow on test/** branches allowed us to validate infrastructure changes safely before merging.
 
-![alt text](diagrams/CICD_Pipeline_StateVersion.png)
+![CI/CD Pipeline](diagrams/CICD_Pipeline_StateVersion.png)
 
 ## Monitoring Architecture and Data Flow
 
