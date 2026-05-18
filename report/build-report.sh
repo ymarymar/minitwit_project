@@ -36,6 +36,7 @@ pandoc "$INPUT" \
     --template="$TEMPLATE" \
     --number-sections \
     --pdf-engine=xelatex \
-    --syntax-highlighting=tango
+    --syntax-highlighting=tango \
+    --from markdown+pipe_tables
 
 echo "Done. Output: $(pwd)/$OUTPUT"
