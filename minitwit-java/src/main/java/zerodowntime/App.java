@@ -106,7 +106,7 @@ public class App {
             config.routes.before("/web/*", ctx -> {
                 String token = ctx.cookie("token");
 
-                if (token != null) {
+                if (token != null && !token.isBlank()) {
                     try {
                         DecodedJWT jwt = JwtUtils.verifyToken(token);
                         ctx.attribute("userId", jwt.getClaim("userId").asInt());
