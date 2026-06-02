@@ -10,7 +10,7 @@ attributes:
 compose:
   ansible_host: do_networks.v4 | selectattr('type', 'eq', 'public') | map(attribute='ip_address') | first
   ansible_user: "'root'"
-  ansible_ssh_private_key_file: "'~/.ssh/id_ed25519'"
+  ansible_ssh_private_key_file: "'~/.ssh/digitalocean'"
 groups:
   swarm: "'swarm' in do_tags"
   db: "'db' in do_tags"
