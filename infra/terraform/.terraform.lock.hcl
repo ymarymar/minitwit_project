@@ -5,7 +5,22 @@ provider "registry.opentofu.org/digitalocean/digitalocean" {
   version     = "2.81.0"
   constraints = "~> 2.0"
   hashes = [
+    "h1:47cuHN8MQlnexcfUS5Toyvcg/9hk+EvHr2uNbfkmPfU=",
+    "h1:4NJJAikBSEbuPNXsrH0DIkkJYdqwNHgFIetBBFKzVDA=",
+    "h1:6I1q3feQgDpZvGdvsuP7n7f141R7VOS66n/ilJ1Zz7c=",
+    "h1:DZG+b3Mv1nwIP0cWPT1iuR/07Tk4MOn0oUiu2ed8Zcs=",
+    "h1:Ey/USSH9mPa17EwXOIZaX8rTus8DWOoR3rC459bQYkg=",
+    "h1:IZNTebBuSOInp3YVDrzh0NhcvI6qwx9iGzQfndSChTY=",
+    "h1:NrGCx3gna7B45ybqA5YJPWKAjIHdRQKtDG5VgrW58+k=",
+    "h1:O/lrFoi358Jp2Jhz27B+JZA6oOIMLLLwtDJTBRfwmZY=",
+    "h1:Rv990iY120/6q7jzJsGKES0dlf2tzjA4RcCo59BSGFc=",
+    "h1:a1BDFvVZB7ud9/xOfwMrBVqZ7vqp3nYm2A/BbwyKPUs=",
+    "h1:cF3PjtlXy3ip57CfydgydMo9uMvWCVC54AlwnbPScDI=",
+    "h1:fSnZPUALODAdUY8c8Wapd3Bh7GYqVeG56U1O06WyEaE=",
     "h1:fTsmsZB9QHWhnYAQESxCsw5fxN9AA0QtKj74ghFVxWA=",
+    "h1:jDNGNe+6Z9oHjN4vFcuxhLLal84SIqnxZLhCIGtONWU=",
+    "h1:rA0MfIf+x36C6lwWgzaQT2CkF1sT+dFI/cPnnjv8bk0=",
+    "h1:vw02m0IX+KQhc8n1OBDKlJlIWJHl4mw+9UwYSDUWR94=",
     "zh:0a35eca6ee12b78f4a080b02f1f77b51159d919cfddc15aea0855b41d3632013",
     "zh:0f871a3f513b789be86403c8b0568f86425fd3c4c3acb971f1f01c8ff165aafc",
     "zh:5b15aa1cc7cbfdb12f2b97b7bd55f1e77dac844d7312919b9727ba11f4a92e56",
