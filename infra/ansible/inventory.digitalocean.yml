@@ -1,5 +1,9 @@
 plugin: community.digitalocean.digitalocean
 oauth_token: "{{ lookup('env', 'DIGITAL_OCEAN_KEY') }}"
+filters:
+  - swarm
+  - db
+  - monitoring
 attributes:
   - id
   - name
